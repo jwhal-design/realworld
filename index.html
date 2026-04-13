@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>REAL-WORLD CONNECTIONS: The Trail</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap');
+
+  :root {
+    --green: #00ff41;
+    --dark-green: #003b0f;
+    --amber: #ffb000;
+    --dark: #0a0a0a;
+    --mid: #111;
+    --dim: #1a1a1a;
+    --text: #c8ffc8;
+    --red: #ff3333;
+    --white: #e8ffe8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--dark);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+    cursor: default;
+  }
+
+  /* SCANLINES */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.15) 2px,
+      rgba(0,0,0,0.15) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* CRT flicker */
+  @keyframes flicker {
+    0%, 100% { opacity: 1; }
+    92% { opacity: 1; }
+    93% { opacity: 0.85; }
+    94% { opacity: 1; }
+    96% { opacity: 0.9; }
+    97% { opacity: 1; }
+  }
+  body { animation: flicker 8s infinite; }
+
+  /* PHOSPHOR GLOW */
+  .glow { text-shadow: 0 0 8px var(--green), 0 0 20px var(--green); }
+  .amber-glow { color: var(--amber); text-shadow: 0 0 8px var(--amber), 0 0 20px var(--amber); }
+  .red-glow { color: var(--red); text-shadow: 0 0 8px var(--red); }
+
+  /* BOOT SCREEN */
+  #boot-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--dark);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 500;
+    padding: 2rem;
+  }
+
+  #boot-screen h1 {
+    font-family: 'VT323', monospace;
+    font-size: clamp(2rem, 6vw, 5rem);
+    color: var(--green);
+    text-shadow: 0 0 10px var(--green), 0 0 30px var(--green);
+    text-align: center;
+    margin-bottom: 1rem;
+    line-height: 1.1;
+  }
+
+  .boot-line {
+    font-size: 0.85rem;
+    color: var(--text);
+    margin: 0.2rem 0;
+    opacity: 0;
+    animation: fadein 0.1s forwards;
+  }
+
+  @keyframes fadein { to { opacity: 1; } }
+
+  .boot-wagon {
+    font-family: 'VT323', monospace;
+    font-size: 3rem;
+    color: var(--amber);
+    text-shadow: 0 0 10px var(--amber);
+    margin: 2rem 0;
+    animation: roll 2s linear infinite;
+  }
+  @keyframes roll {
+    0% { transform: translateX(-20px); }
+    100% { transform: translateX(20px); }
+  }
+
+  #start-btn {
+    margin-top: 2rem;
+    font-family: 'VT323', monospace;
+    font-size: 2rem;
+    background: none;
+    border: 2px solid var(--green);
+    color: var(--green);
+    padding: 0.5rem 2rem;
+    cursor: pointer;
+    text-shadow: 0 0 8px var(--green);
+    box-shadow: 0 0 10px var(--green), inset 0 0 10px rgba(0,255,65,0.1);
+    transition: all 0.2s;
+    animation: blink-border 1s step-end infinite;
+  }
+  @keyframes blink-border {
+    50% { box-shadow: 0 0 4px var(--green), inset 0 0 4px rgba(0,255,65,0.05); }
+  }
+  #start-btn:hover {
+    background: rgba(0,255,65,0.15);
+    box-shadow: 0 0 20px var(--green), inset 0 0 20px rgba(0,255,65,0.2);
+  }
+
+  /* MAIN GAME */
+  #game {
+    display: none;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1rem;
+  }
+
+  /* HEADER */
+  .game-header {
+    border: 1px solid var(--green);
+    box-shadow: 0 0 10px rgba(0,255,65,0.3);
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    background: var(--dim);
+  }
+
+  .party-status {
+    font-size: 0.8rem;
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  .trail-progress {
+    text-align: right;
+    font-size: 0.8rem;
+  }
+
+  .progress-bar {
+    width: 200px;
+    height: 16px;
+    border: 1px solid var(--green);
+    margin-top: 0.3rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    transition: width 0.8s ease;
+    width: 0%;
+  }
+
+  /* PANELS */
+  .panel {
+    border: 1px solid var(--green);
+    background: var(--dim);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 0 8px rgba(0,255,65,0.2);
+    display: none;
+  }
+  .panel.active { display: block; }
+
+  .panel-title {
+    font-family: 'VT323', monospace;
+    font-size: 1.8rem;
+    color: var(--amber);
+    text-shadow: 0 0 8px var(--amber);
+    border-bottom: 1px solid var(--dark-green);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .panel p {
+    color: var(--text);
+    line-height: 1.7;
+    margin-bottom: 0.8rem;
+    font-size: 0.9rem;
+  }
+
+  .panel p strong {
+    color: var(--green);
+  }
+
+  /* NARRATIVE BOX */
+  .narrative {
+    border-left: 3px solid var(--amber);
+    padding: 0.8rem 1rem;
+    margin: 1rem 0;
+    background: rgba(255,176,0,0.05);
+    font-size: 0.85rem;
+    color: var(--amber);
+    font-style: italic;
+  }
+
+  /* CHOICES */
+  .choices {
+    margin-top: 1.2rem;
+  }
+  .choice-label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text);
+    margin-bottom: 0.8rem;
+  }
+
+  .choice-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 1px solid var(--dark-green);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.85rem;
+    padding: 0.6rem 1rem;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    line-height: 1.4;
+  }
+  .choice-btn:hover {
+    border-color: var(--green);
+    color: var(--green);
+    background: rgba(0,255,65,0.05);
+    text-shadow: 0 0 6px var(--green);
+  }
+  .choice-btn.correct {
+    border-color: var(--green);
+    color: var(--green);
+    background: rgba(0,255,65,0.1);
+    text-shadow: 0 0 6px var(--green);
+  }
+  .choice-btn.wrong {
+    border-color: var(--red);
+    color: var(--red);
+    background: rgba(255,51,51,0.05);
+  }
+  .choice-btn:disabled { cursor: not-allowed; opacity: 0.6; }
+
+  /* TEXT INPUT */
+  .code-input-wrap {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+  .code-input {
+    background: var(--mid);
+    border: 1px solid var(--green);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1rem;
+    padding: 0.5rem 0.8rem;
+    flex: 1;
+    min-width: 150px;
+    text-transform: uppercase;
+    box-shadow: inset 0 0 8px rgba(0,255,65,0.1);
+  }
+  .code-input:focus {
+    outline: none;
+    box-shadow: inset 0 0 8px rgba(0,255,65,0.2), 0 0 8px rgba(0,255,65,0.3);
+  }
+  .submit-btn {
+    background: none;
+    border: 1px solid var(--green);
+    color: var(--green);
+    font-family: 'VT323', monospace;
+    font-size: 1.4rem;
+    padding: 0.3rem 1.2rem;
+    cursor: pointer;
+    text-shadow: 0 0 6px var(--green);
+    transition: all 0.2s;
+  }
+  .submit-btn:hover {
+    background: rgba(0,255,65,0.15);
+    box-shadow: 0 0 10px var(--green);
+  }
+
+  /* FEEDBACK */
+  .feedback {
+    margin-top: 0.8rem;
+    font-size: 0.85rem;
+    min-height: 1.2rem;
+    line-height: 1.5;
+  }
+  .feedback.good { color: var(--green); text-shadow: 0 0 6px var(--green); }
+  .feedback.bad { color: var(--red); }
+
+  /* DEATH SCREEN */
+  #death-screen {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    z-index: 400;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    text-align: center;
+    padding: 2rem;
+  }
+  #death-screen h2 {
+    font-family: 'VT323', monospace;
+    font-size: 4rem;
+    color: var(--red);
+    text-shadow: 0 0 20px var(--red);
+    margin-bottom: 1rem;
+  }
+  #death-screen p {
+    color: var(--text);
+    font-size: 0.9rem;
+    max-width: 500px;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+  }
+  #retry-btn {
+    font-family: 'VT323', monospace;
+    font-size: 1.8rem;
+    background: none;
+    border: 2px solid var(--red);
+    color: var(--red);
+    padding: 0.4rem 2rem;
+    cursor: pointer;
+    text-shadow: 0 0 8px var(--red);
+  }
+  #retry-btn:hover { background: rgba(255,51,51,0.15); }
+
+  /* WIN SCREEN */
+  #win-screen {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: var(--dark);
+    z-index: 400;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    text-align: center;
+    padding: 2rem;
+    overflow-y: auto;
+  }
+  #win-screen h2 {
+    font-family: 'VT323', monospace;
+    font-size: clamp(2.5rem, 7vw, 5rem);
+    color: var(--amber);
+    text-shadow: 0 0 20px var(--amber), 0 0 60px var(--amber);
+    margin-bottom: 1rem;
+  }
+  #win-screen .win-content {
+    max-width: 600px;
+    color: var(--text);
+    font-size: 0.9rem;
+    line-height: 1.8;
+  }
+  .unlock-code {
+    font-family: 'VT323', monospace;
+    font-size: 3rem;
+    color: var(--green);
+    text-shadow: 0 0 15px var(--green);
+    border: 2px solid var(--green);
+    padding: 0.5rem 2rem;
+    margin: 1.5rem 0;
+    letter-spacing: 0.3em;
+    box-shadow: 0 0 20px rgba(0,255,65,0.4);
+    animation: pulse-border 2s ease-in-out infinite;
+  }
+  @keyframes pulse-border {
+    0%, 100% { box-shadow: 0 0 20px rgba(0,255,65,0.4); }
+    50% { box-shadow: 0 0 40px rgba(0,255,65,0.7); }
+  }
+
+  /* TOMBSTONE EASTER EGG */
+  .tombstone {
+    font-family: 'VT323', monospace;
+    font-size: 1rem;
+    color: #555;
+    border: 1px solid #333;
+    padding: 0.5rem 1rem;
+    margin: 0.5rem;
+    display: inline-block;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  .tombstone:hover { color: var(--red); border-color: var(--red); }
+
+  /* STARS */
+  .stars { letter-spacing: 0.3em; margin-bottom: 0.5rem; }
+
+  /* TYPEWRITER */
+  @keyframes typewriter {
+    from { width: 0; }
+    to { width: 100%; }
+  }
+  .type-animate {
+    overflow: hidden;
+    white-space: nowrap;
+    animation: typewriter 1.5s steps(40) forwards;
+  }
+
+  /* SECTION NAV */
+  .section-nav {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+  .nav-stop {
+    font-family: 'VT323', monospace;
+    font-size: 1.1rem;
+    padding: 0.2rem 0.8rem;
+    border: 1px solid var(--dark-green);
+    color: #444;
+    cursor: default;
+  }
+  .nav-stop.done {
+    border-color: var(--green);
+    color: var(--green);
+    text-shadow: 0 0 4px var(--green);
+  }
+  .nav-stop.current {
+    border-color: var(--amber);
+    color: var(--amber);
+    text-shadow: 0 0 6px var(--amber);
+    animation: blink-border 0.8s step-end infinite;
+  }
+
+  /* MOBILE */
+  @media (max-width: 600px) {
+    .game-header { flex-direction: column; }
+    .progress-bar { width: 100%; }
+    .trail-progress { text-align: left; }
+  }
+</style>
+</head>
+<body>
+
+<!-- BOOT SCREEN -->
+<div id="boot-screen">
+  <h1 class="glow">REAL-WORLD<br>CONNECTIONS</h1>
+  <div class="boot-wagon">🪄🐂🐂</div>
+  <div id="boot-lines"></div>
+  <button id="start-btn" onclick="startGame()">[ PRESS ENTER TO BEGIN ]</button>
+</div>
+
+<!-- DEATH SCREEN -->
+<div id="death-screen">
+  <h2>YOU HAVE DIED</h2>
+  <p id="death-msg">Your wagon has broken down on the trail.</p>
+  <p style="color:#555; font-size:0.8rem; margin-top:0.5rem;">
+    Somewhere in a parallel timeline, a supervillain in a turtleneck<br>
+    is watching this happen from a boardroom and feeling deeply seen.
+  </p>
+  <button id="retry-btn" onclick="retryQuestion()">[ TRY AGAIN ]</button>
+</div>
+
+<!-- WIN SCREEN -->
+<div id="win-screen">
+  <h2>YOU HAVE ARRIVED</h2>
+  <div class="win-content">
+    <p class="amber-glow" style="font-family:'VT323',monospace; font-size:1.8rem;">
+      FLYING COW CAFE — YOU HAVE ARRIVED
+    </p>
+    <p style="margin: 1rem 0;">
+      Your party has crossed the OU Research Campus.<br>
+      All four components of Real-World Connections: unlocked.<br>
+      The Queen Dean is pleased. She sent a candygram.
+    </p>
+    <p style="color:#555; font-size:0.8rem; font-style:italic; margin-bottom:1.5rem;">
+      Todd wanted to debrief. Kevin checked the sparkling water fridge one more time.
+    </p>
+    <p>Your unlock code for today's session:</p>
+    <div class="unlock-code" id="final-code">REALWORLD</div>
+    <p style="font-size:0.8rem; color:#555;">Show this to your facilitator to begin the design challenge.</p>
+    <div style="margin-top:2rem;">
+      <p style="color:#333; font-size:0.75rem; margin-bottom:0.5rem;">PARTY MEMBERS LOST ON THE TRAIL:</p>
+      <span class="tombstone" title="Gone but not forgotten">📿 The Soda Fridge (Empty, 1985)</span>
+      <span class="tombstone" title="It's iterative">📿 Todd's First Draft</span>
+      <span class="tombstone" title="Dr. Scott tried to warn us">📿 The Walk to 3PP</span>
+      <span class="tombstone" title="There was a LEARN strategy for that">📿 Worksheet Wednesday</span>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN GAME -->
+<div id="game">
+  <div class="game-header">
+    <div class="party-status">
+      <div class="glow" style="font-family:'VT323',monospace; font-size:1.4rem; margin-bottom:0.3rem;">K20 TRAIL — 1985 EDITION</div>
+      <div>Party: <span id="party-display" style="color:var(--green)">Loading...</span></div>
+      <div>Condition: <span id="condition-display" style="color:var(--amber)">Good</span></div>
+    </div>
+    <div class="trail-progress">
+      <div style="font-size:0.75rem; margin-bottom:0.3rem;">STOPS TO FLYING COW CAFE</div>
+      <div class="progress-bar"><div class="progress-fill" id="prog-fill"></div></div>
+      <div id="miles-display" style="font-size:0.75rem; margin-top:0.3rem; color:var(--amber)">0 / 4 COMPONENTS UNLOCKED</div>
+    </div>
+  </div>
+
+  <div class="section-nav" id="trail-stops"></div>
+
+  <!-- PANELS 1-4 and INTRO rendered by JS -->
+  <div id="panels-container"></div>
+</div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+const PARTY = ["Deborah", "Todd", "Kevin", "You"];
+
+const STOPS = [
+  { id: "intro",    label: "2PP — STARTING POINT" },
+  { id: "tasks",    label: "STEPHENSON LIFE SCIENCES" },
+  { id: "tools",    label: "3PP (THE LONG WALK)" },
+  { id: "audience", label: "4PP" },
+  { id: "culture",  label: "FLYING COW CAFE ★" },
+];
+
+const QUESTIONS = {
+  tasks: {
+    title: "STEPHENSON LIFE SCIENCES CENTER — Authentic Tasks",
+    intro: `You've made it across Monitor Ave. A researcher blocks the entrance, holding a clipboard and wearing the expression of someone who has been to 3PP and back today.\n\n"Nobody gets past this building without knowing what makes a learning task AUTHENTIC. Also Danny says he found tracks near the Radar Lab. Large ones. He also noted the barometric pressure is dropping. Nobody asked him about the barometric pressure. He brought it up himself.\n\nWe're not stopping for any of that right now. Read the brief. A teacher needs your help."`,
+    questions: [
+      {
+        text: `SCENARIO: A 10th grade biology teacher has students complete a lab report after dissecting a frog. The report follows a standard template: hypothesis, procedure, observations, conclusion. It will be graded separately from the lab itself. The teacher says: "This prepares them for college science writing."\n\nAs an instructional designer, what is the CORE problem with this task's authenticity?`,
+        options: [
+          "A) The topic is outdated — modern biology classes should use simulations instead of dissection",
+          "B) The assessment is separated from the task, and the template removes the thinking that makes scientific writing authentic",
+          "C) Lab reports are too advanced for 10th graders without scaffolding",
+          "D) The task is fine — college prep is a legitimate real-world connection"
+        ],
+        correct: 1,
+        explanation: "Two things break the authenticity here. First: the brief says assessment should be embedded in the task, not separate. Second: real scientists don't fill in templates — they make decisions about how to communicate findings. The template does the thinking for students. The college prep framing is a red herring. That's a stated goal, not a real-world connection built into the task itself."
+      },
+      {
+        text: `SCENARIO: Same teacher. You suggest redesigning the lab report so students write for a specific audience — say, a school board considering whether to fund a new science lab. The teacher responds: "But then how do I grade it? There's no rubric for that."\n\nWhat does the brief suggest is actually happening when assessment is embedded into an authentic task?`,
+        options: [
+          "A) Grading becomes impossible, which is why authentic tasks work better as ungraded experiences",
+          "B) The product itself demonstrates learning — the quality of the communication to a real audience IS the assessment",
+          "C) Teachers should use a standard rubric and just change the audience on the cover sheet",
+          "D) Authentic tasks should be assessed by peers, not teachers, to maintain real-world validity"
+        ],
+        correct: 1,
+        explanation: "The brief's point is that authentic formative assessment engages students realistically within the activity. When students write to a real audience with real stakes, the quality of that work reveals understanding far better than checking boxes on a template. The grading problem the teacher is worried about is actually a sign the task is working — it requires judgment, not just scoring."
+      }
+    ],
+    deathMsg: "Turned back at Stephenson Life Sciences. The brief has a scenario just like this. Go back and read the Authentic Tasks section — specifically what it says about assessment.",
+    unlock: "TASKS"
+  },
+  tools: {
+    title: "THREE PARTNERS PLACE — Authentic Tools",
+    intro: `You have arrived at 3PP.\n\nThe walk was exactly as long as everyone warned you it would be. Todd asked if we could have just done this over Zoom. Nobody answered Todd.\n\nYour Teams notification count is now 7. You will not be checking those.\n\nMatt is already inside somehow, squinting into the middle distance like he's blocking a Neil Breen film.\n\n"There's a LEARN strategy for that," he says, gesturing vaguely at the building.\n\nThere probably is. But first — a teacher needs your help with TOOLS."`,
+    questions: [
+      {
+        text: `SCENARIO: A middle school journalism teacher has students write news articles about school events. Students use Google Docs. The teacher is proud of the unit. A colleague says: "Real journalists don't use Google Docs — they use professional CMS platforms. This isn't authentic."\n\nUsing the brief, how do you respond?`,
+        options: [
+          "A) The colleague is right — the tool needs to match professional practice exactly or the authenticity is undermined",
+          "B) The colleague is wrong — the brief says tool authenticity comes from the thinking and professional practice the tool enables, not brand-name matching",
+          "C) The teacher should compromise by using Google Sites instead, which looks more professional",
+          "D) Tool choice doesn't matter for authenticity — only the task and audience components count"
+        ],
+        correct: 1,
+        explanation: "The brief says even if the learning task isn't 'realistic' to the professional world, students using tools they might encounter in a profession gain applicable skills and a sense of connection. Google Docs is what most working writers actually use. The colleague is confusing 'authentic tools' with 'specific brand compliance.' The brief is about the thinking and practice the tools enable — not logo matching."
+      },
+      {
+        text: `SCENARIO: A high school economics teacher wants to make a personal finance unit more authentic. Currently students use a fictional budget worksheet. She's considering three upgrades. Which one best fits the brief's definition of authentic tools?\n`,
+        options: [
+          "A) Replace the worksheet with a fancier worksheet that has a bank logo on it",
+          "B) Have students use actual budgeting software (like Mint or a spreadsheet template used by a local credit union) to manage a realistic scenario with real categories and real constraints",
+          "C) Show a documentary about personal finance before handing out the worksheet",
+          "D) Have students interview their parents about budgets, then return to the worksheet"
+        ],
+        correct: 1,
+        explanation: "Option B gives students the actual tool of the profession and positions them to imagine themselves as people who manage real finances. The brief is explicit: using professional-world tools creates a level of realism that increases motivation and develops applicable skills. The other options add context or decoration — they don't change the tool itself."
+      }
+    ],
+    deathMsg: "You walked all the way to 3PP for this. There was a LEARN strategy for that. There is always a LEARN strategy for that. Go back and read the Authentic Tools section.",
+    unlock: "TOOLS"
+  },
+  audience: {
+    title: "FOUR PARTNERS PLACE — Authentic Audiences",
+    intro: `A candygram arrives. It is from the Queen Dean.\n\nIt reads: "I believe in your party. I believe in this framework. I believe you read the brief."\n\nShe did not have to do that. She never has to. She does it anyway.\n\nTodd suggests we turn this whole experience into a LEARN strategy. The checkpoint guardian stares at him for a long moment.\n\n"It's not in the LEARN pipeline, Todd."\n\nTodd writes it down anyway. In honor of the Queen Dean — a teacher needs your help with AUDIENCES."`,
+    questions: [
+      {
+        text: `SCENARIO: An 8th grade English class writes persuasive essays. The prompt is: "Should students have cell phones in school?" Essays are turned in to the teacher, graded, and returned. The teacher calls it "real-world writing" because persuasion is a life skill.\n\nWhat's the authenticity problem the brief would identify?`,
+        options: [
+          "A) The topic is too controversial for middle school",
+          "B) Persuasion is actually not a real-world skill — it belongs in debate class",
+          "C) The teacher is the only audience, which means students are performing for a grade rather than actually trying to persuade anyone — undermining the higher-order thinking that real audiences produce",
+          "D) The essay format is outdated — students should make videos instead"
+        ],
+        correct: 2,
+        explanation: "The brief is precise here: when students perceive their work holds value to a real audience — especially one connected to their community — motivation and depth of engagement increase. Writing to a teacher who will grade it is not the same cognitive experience as writing to a real school board, local paper, or community group who might actually respond. The audience IS the task. Change the audience and you change everything."
+      },
+      {
+        text: `SCENARIO: You suggest the same teacher submit the strongest essays to the actual school board ahead of their cell phone policy vote. The teacher says: "That feels risky. What if students write something embarrassing?"\n\nWhat does the brief suggest is actually happening in that moment of risk?`,
+        options: [
+          "A) The teacher is right to be cautious — authentic audiences introduce liability that outweighs the learning benefit",
+          "B) The risk IS the learning. Real audiences create real stakes, which is exactly what drives higher-order thinking and complex problem-solving",
+          "C) The solution is to pre-screen all work before it reaches the real audience, eliminating the authenticity but protecting the teacher",
+          "D) Authentic audience activities should only be used with advanced students who can handle the pressure"
+        ],
+        correct: 1,
+        explanation: "The brief says giving students the opportunity to create products significant to an outside audience engages them in higher-order thinking AND complex problem-solving simultaneously. The discomfort the teacher is feeling — that the stakes are real — is precisely the mechanism that makes the learning work. Removing the risk removes the point."
+      }
+    ],
+    deathMsg: "The Queen Dean sent a candygram and everything. You owe her better than this. Go back and read the Authentic Audiences section.",
+    unlock: "AUDIENCE"
+  },
+  culture: {
+    title: "NATIONAL WEATHER CENTER — Cultural Connections",
+    intro: `The Flying Cow Cafe is in sight.\n\nDanny jogs up from the direction of the Radar Innovations Lab, slightly out of breath.\n\n"I found something. Out by the parking lot. Only something with hands could have done that. Also the barometric pressure just shifted. Significantly."\n\nTodd starts to ask a follow-up question. Danny is already gone.\n\nOne final checkpoint between you and coffee. A teacher needs your help with CULTURAL CONNECTIONS."`,
+    questions: [
+      {
+        text: `SCENARIO: A rural Oklahoma high school serves a student population that is 60% Native American. The history teacher does a unit on westward expansion using a standard textbook. Students seem disengaged. The teacher says: "They just don't care about history."\n\nWhat does the brief say is actually happening here?`,
+        options: [
+          "A) Rural students generally have shorter attention spans — the teacher needs more multimedia",
+          "B) The textbook approach creates a discrepancy between students' cultural frameworks and the school's curriculum — students aren't disengaged from history, they're disengaged from a version of history that positions them as backdrop rather than protagonists",
+          "C) History is inherently abstract — the teacher needs more primary sources regardless of student background",
+          "D) The students need more foundational vocabulary before engaging with complex historical content"
+        ],
+        correct: 1,
+        explanation: "The brief is direct: when there is a discrepancy between students' home cultures and school culture, students face an academic disadvantage. This isn't about attention spans or vocabulary. The students likely know a great deal about this period of history from their own cultural perspective. The textbook is telling a story that renders their families invisible or defeated. The brief calls for building real-world connections that are culturally relevant — which here means finding the version of this history that centers their community's experience."
+      },
+      {
+        text: `SCENARIO: Same teacher. You suggest redesigning the unit so students can demonstrate their learning by choosing from three options: (1) write a traditional essay, (2) create an oral history recording in the tradition of their community, or (3) design an exhibit for the tribal nation's cultural center. The teacher asks: "Isn't that lowering standards by giving easier options?"\n\nWhat does the brief say about this kind of choice?`,
+        options: [
+          "A) The teacher is right — differentiated products create equity concerns about grading consistency",
+          "B) The brief would agree this lowers rigor — authentic tasks should have a single defined form",
+          "C) Providing choices that enable students to use cultural strengths to demonstrate learning is how teachers leverage culture toward real-world connection — it's not easier, it's more demanding because it requires genuine understanding to adapt",
+          "D) Choice is appropriate only when students have learning disabilities that prevent standard assessment"
+        ],
+        correct: 2,
+        explanation: "The brief says teachers can leverage culture by providing choices that enable students to use cultural strengths to demonstrate their learning. An oral history for a tribal cultural center is not a lower-stakes task than a five-paragraph essay — it's a harder one, for a real audience, using a real cultural form. The teacher's assumption that the essay is the rigorous option and everything else is accommodation reveals exactly the cultural mismatch the brief is describing."
+      }
+    ],
+    deathMsg: "Danny found tracks near the Radar Lab. Large ones. Only something with hands could have done that. This is not the time to be wrong about Cultural Connections. Go back and read.",
+    unlock: "CULTURE"
+  }
+};
+
+// ============================================================
+// STATE
+// ============================================================
+let state = {
+  currentStop: "intro",
+  currentQ: 0,
+  wrongCount: 0,
+  unlocked: [],
+  currentDeathMsg: "",
+  currentPanel: null
+};
+
+// ============================================================
+// BOOT SEQUENCE
+// ============================================================
+const bootLines = [
+  "APPLE II — 64K RAM SYSTEM",
+  "LOADING K20 TRAIL v1985...",
+  "",
+  "MECC SOFTWARE",
+  "REAL-WORLD CONNECTIONS EDITION",
+  "",
+  "► Your party departs Two Partners Place.",
+  "  Destination: Flying Cow Cafe, NWS Center.",
+  "",
+  "► Four checkpoints guard the campus.",
+  "  Only those who have read the brief may pass.",
+  "",
+  "► The walk to 3PP is longer than you think.",
+  "  Todd is already asking questions.",
+];
+
+window.onload = () => {
+  const container = document.getElementById("boot-lines");
+  bootLines.forEach((line, i) => {
+    const el = document.createElement("div");
+    el.className = "boot-line";
+    el.style.animationDelay = `${i * 0.12}s`;
+    el.textContent = line || " ";
+    el.style.fontSize = "0.8rem";
+    el.style.color = line.startsWith("►") ? "#ffb000" : "#c8ffc8";
+    el.style.margin = "0.1rem 0";
+    container.appendChild(el);
+  });
+};
+
+function startGame() {
+  document.getElementById("boot-screen").style.display = "none";
+  document.getElementById("game").style.display = "block";
+  renderTrailStops();
+  showPanel("intro");
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function renderTrailStops() {
+  const nav = document.getElementById("trail-stops");
+  nav.innerHTML = STOPS.map(s => `
+    <div class="nav-stop ${s.id === state.currentStop ? 'current' : state.unlocked.includes(s.id) || s.id === 'intro' ? 'done' : ''}" 
+         id="nav-${s.id}">${s.label}</div>
+  `).join("");
+}
+
+function updateNav() {
+  STOPS.forEach(s => {
+    const el = document.getElementById(`nav-${s.id}`);
+    if (!el) return;
+    el.className = `nav-stop ${s.id === state.currentStop ? 'current' : state.unlocked.includes(s.id) || s.id === 'intro' ? 'done' : ''}`;
+  });
+}
+
+function updateProgress() {
+  const pct = (state.unlocked.length / 4) * 100;
+  document.getElementById("prog-fill").style.width = pct + "%";
+  document.getElementById("miles-display").textContent = `${state.unlocked.length} / 4 COMPONENTS UNLOCKED`;
+  document.getElementById("party-display").textContent = PARTY.join(", ");
+  const conditions = ["Good", "Fair", "Poor", "Very Poor", "Terrible"];
+  document.getElementById("condition-display").textContent = conditions[Math.min(state.wrongCount, 4)];
+}
+
+// ============================================================
+// PANELS
+// ============================================================
+function showPanel(id) {
+  state.currentStop = id;
+  state.currentQ = 0;
+  updateNav();
+  updateProgress();
+
+  const container = document.getElementById("panels-container");
+
+  if (id === "intro") {
+    container.innerHTML = `
+      <div class="panel active" id="panel-intro">
+        <div class="panel-title amber-glow">DEPARTURE — TWO PARTNERS PLACE</div>
+        <div class="narrative">
+          Spring, 1985. Your wagon party — Deborah, Todd, Kevin, and You —
+          has assembled in the parking lot outside Two Partners Place.<br><br>
+          Your destination: the Flying Cow Cafe at the National Weather Center.<br>
+          It is further than it looks on the map.<br><br>
+          Four checkpoints guard the campus. At each one, you must demonstrate
+          knowledge of the K20 IDEALS Real-World Connections brief.
+          Read the brief. Know the brief. The campus does not grade on a curve.<br><br>
+          Dr. Scott tried to warn you this would be on the trail.
+          You didn't listen. You never listen.
+        </div>
+        <p>The framework organizes Real-World Connections into four components:</p>
+        <p>
+          <strong>► AUTHENTIC TASKS</strong> — The nature of what students are asked to do<br>
+          <strong>► AUTHENTIC TOOLS</strong> — The instruments and resources students use<br>
+          <strong>► AUTHENTIC AUDIENCES</strong> — Who receives and responds to student work<br>
+          <strong>► CULTURAL CONNECTIONS</strong> — How learning connects to students' lived worlds
+        </p>
+        <p style="color:var(--text); font-size:0.85rem; margin-top:0.8rem;">
+          Kevin checked the sparkling water fridge before leaving. It was empty. It is always empty.
+          He has accepted this. Kevin has accepted many things.
+        </p>
+        <div class="choices">
+          <button class="choice-btn" onclick="showPanel('tasks')" style="border-color:var(--green); color:var(--green); text-shadow:0 0 6px var(--green);">
+            [ HEAD FOR STEPHENSON LIFE SCIENCES → ]
+          </button>
+        </div>
+      </div>
+    `;
+  } else {
+    renderQuestionPanel(id);
+  }
+}
+
+function renderQuestionPanel(stopId) {
+  const data = QUESTIONS[stopId];
+  const q = data.questions[state.currentQ];
+  const container = document.getElementById("panels-container");
+
+  container.innerHTML = `
+    <div class="panel active" id="panel-${stopId}">
+      <div class="panel-title">${data.title}</div>
+      <div class="narrative" id="stop-intro">${data.intro.replace(/\n/g,'<br>')}</div>
+      
+      <p style="margin-top:1rem; color:var(--amber); font-size:0.8rem;">
+        QUESTION ${state.currentQ + 1} OF ${data.questions.length}
+      </p>
+      <p style="margin-top:0.5rem;"><strong>${q.text}</strong></p>
+      
+      <div class="choices" id="choices-${stopId}">
+        ${q.options.map((opt, i) => `
+          <button class="choice-btn" onclick="selectAnswer('${stopId}', ${i})" id="choice-${i}">
+            ${opt}
+          </button>
+        `).join("")}
+      </div>
+      
+      <div class="feedback" id="feedback-${stopId}"></div>
+    </div>
+  `;
+}
+
+// ============================================================
+// ANSWER LOGIC
+// ============================================================
+function selectAnswer(stopId, idx) {
+  const data = QUESTIONS[stopId];
+  const q = data.questions[state.currentQ];
+  const feedback = document.getElementById(`feedback-${stopId}`);
+  const buttons = document.querySelectorAll(`#choices-${stopId} .choice-btn`);
+
+  buttons.forEach(b => b.disabled = true);
+  buttons[idx].classList.add(idx === q.correct ? "correct" : "wrong");
+
+  if (idx === q.correct) {
+    feedback.className = "feedback good";
+    feedback.textContent = "✓ CORRECT. " + q.explanation;
+
+    // Move to next question or unlock
+    setTimeout(() => {
+      if (state.currentQ < data.questions.length - 1) {
+        state.currentQ++;
+        renderQuestionPanel(stopId);
+      } else {
+        unlockStop(stopId);
+      }
+    }, 2200);
+  } else {
+    state.wrongCount++;
+    updateProgress();
+    feedback.className = "feedback bad";
+    feedback.textContent = "✗ INCORRECT. Check the brief.";
+    state.currentDeathMsg = data.deathMsg;
+    state.currentPanel = stopId;
+    setTimeout(() => showDeath(data.deathMsg), 1500);
+  }
+}
+
+function unlockStop(stopId) {
+  if (!state.unlocked.includes(stopId)) {
+    state.unlocked.push(stopId);
+  }
+  updateProgress();
+
+  const nextLabels = { tasks: "THREE PARTNERS PLACE", tools: "FOUR PARTNERS PLACE", audience: "NATIONAL WEATHER CENTER" };
+  const nextMap = { tasks: "tools", tools: "audience", audience: "culture", culture: "WIN" };
+  const next = nextMap[stopId];
+
+  if (next === "WIN") {
+    showWin();
+  } else {
+    const container = document.getElementById("panels-container");
+    const panel = document.getElementById(`panel-${stopId}`);
+    if (panel) {
+      panel.innerHTML += `
+        <div style="margin-top:1.5rem; border-top:1px solid var(--dark-green); padding-top:1rem;">
+          <div style="color:var(--green); text-shadow:0 0 8px var(--green); font-family:'VT323',monospace; font-size:1.8rem; margin-bottom:0.5rem;">
+            CHECKPOINT CLEARED ✓
+          </div>
+          <p style="color:var(--text); font-size:0.85rem; margin-bottom:1rem;">
+            Component unlocked: <strong>${stopId.toUpperCase()}</strong>. 
+            Your party presses on.
+          </p>
+          <button class="choice-btn" onclick="showPanel('${next}')" 
+                  style="border-color:var(--green); color:var(--green); text-shadow:0 0 6px var(--green);">
+            [ CONTINUE TO ${nextLabels[stopId] || 'NEXT STOP'} → ]
+          </button>
+        </div>
+      `;
+    }
+    updateNav();
+  }
+}
+
+// ============================================================
+// DEATH / RETRY
+// ============================================================
+function showDeath(msg) {
+  const screen = document.getElementById("death-screen");
+  document.getElementById("death-msg").textContent = msg;
+  screen.style.display = "flex";
+}
+
+function retryQuestion() {
+  document.getElementById("death-screen").style.display = "none";
+  renderQuestionPanel(state.currentPanel);
+}
+
+// ============================================================
+// WIN
+// ============================================================
+function showWin() {
+  document.getElementById("win-screen").style.display = "flex";
+  // Rain some green chars
+  rainChars();
+}
+
+function rainChars() {
+  const chars = "REALWORLDCONNECTIONS01";
+  for (let i = 0; i < 30; i++) {
+    setTimeout(() => {
+      const el = document.createElement("div");
+      el.style.cssText = `
+        position:fixed; top:-20px; left:${Math.random()*100}vw;
+        color:var(--green); font-family:'Share Tech Mono',monospace;
+        font-size:${0.7+Math.random()}rem; opacity:0.6; z-index:300;
+        text-shadow:0 0 6px var(--green); pointer-events:none;
+        animation: fall ${1+Math.random()*2}s linear forwards;
+      `;
+      el.textContent = chars[Math.floor(Math.random()*chars.length)];
+      document.body.appendChild(el);
+      setTimeout(()=>el.remove(), 3000);
+    }, i*100);
+  }
+}
+
+const style = document.createElement("style");
+style.textContent = `@keyframes fall { to { transform:translateY(110vh); opacity:0; } }`;
+document.head.appendChild(style);
+</script>
+</body>
+</html>
